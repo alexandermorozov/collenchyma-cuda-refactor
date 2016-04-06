@@ -50,6 +50,8 @@ impl Device for CudaDevice {
 }
 
 impl MemoryTransfer for CudaDevice {
+    /// "Cuda" can transfer to/from Native memory, but cannot transfer
+    /// between two cuda devices directly in this implementation.
     fn transfer_out(&self, my_memory: &Any, dst_device: &Any, dst_memory: &mut Any)
                     -> Result<(), Error> {
         if let Some(_) = dst_device.downcast_ref::<NativeDevice>() {
@@ -72,5 +74,25 @@ impl MemoryTransfer for CudaDevice {
         }
 
         Err(Error::NoMemoryTransferRoute)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use collenchyma_refactor::SharedTensor;
+    use collenchyma_refactor::native::{NativeDevice, NativeMemory};
+
+    #[test]
+    fn cuda_transfer_works() {
+        let ndev = NativeDevice::new(0);
+        let cdev = CudaDevice::new(0);
+
+        let mut s1 = SharedTensor::new(vec![1,2,3]);
+        for x in s1.write_only(&cdev).unwrap().mut_mem().as_mut_cuda_slice() {
+            *x = 11;
+        }
+        assert_eq!(s1.read(&ndev).unwrap().mem().as_slice(),
+                   [11, 11, 11, 11, 11, 11])
     }
 }
