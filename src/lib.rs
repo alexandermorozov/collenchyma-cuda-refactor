@@ -80,11 +80,11 @@ impl MemoryTransfer for CudaDevice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collenchyma_refactor::SharedTensor;
-    use collenchyma_refactor::native::{NativeDevice, NativeMemory};
+    use collenchyma_refactor::{SharedTensor, Error};
+    use collenchyma_refactor::native::{NativeDevice};
 
     #[test]
-    fn cuda_transfer_works() {
+    fn cuda_to_native_transfer_works() {
         let ndev = NativeDevice::new(0);
         let cdev = CudaDevice::new(0);
 
@@ -93,6 +93,29 @@ mod tests {
             *x = 11;
         }
         assert_eq!(s1.read(&ndev).unwrap().mem().as_slice(),
-                   [11, 11, 11, 11, 11, 11])
+                   [11, 11, 11, 11, 11, 11]);
+    }
+
+    #[test]
+    fn native_to_cuda_transfer_works() {
+        let ndev = NativeDevice::new(0);
+        let cdev = CudaDevice::new(0);
+
+        let mut s1 = SharedTensor::new(vec![1,2,3]);
+        for x in s1.write_only(&ndev).unwrap().mut_mem().as_mut_slice() {
+            *x = 11;
+        }
+        assert_eq!(s1.read(&cdev).unwrap().mem().as_cuda_slice(),
+                   [11, 11, 11, 11, 11, 11]);
+    }
+
+    #[test]
+    fn cuda_to_cuda_transfer_fails() {
+        let cdev1 = CudaDevice::new(0);
+        let cdev2 = CudaDevice::new(1);
+
+        let mut s1 = SharedTensor::new(vec![1,2,3]);
+        s1.write_only(&cdev1).unwrap();
+        assert_eq!(s1.read(&cdev2).unwrap_err(), Error::NoMemoryTransferRoute)
     }
 }
